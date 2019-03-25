@@ -1,8 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layout xmlns:android="http://schemas.android.com/apk/res/android">
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    >
 
     <android.support.constraint.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        ></android.support.constraint.ConstraintLayout>
+        >
+
+        <me.aluceps.practiceverticalseekbar.VerticalSeekBar
+            android:layout_width="100dp"
+            android:layout_height="match_parent"
+            android:layout_margin="32dp"
+            android:background="@android:color/darker_gray"
+            android:paddingStart="32dp"
+            android:paddingTop="0dp"
+            android:paddingEnd="32dp"
+            android:paddingBottom="0dp"
+            android:progressDrawable="@drawable/progress"
+            android:thumb="@drawable/ic_thumb"
+            app:direction_to="top"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:max="@{100}"
+            />
+    </android.support.constraint.ConstraintLayout>
 </layout>
