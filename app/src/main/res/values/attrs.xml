@@ -9,4 +9,20 @@
         </attr>
         <attr name="max" format="integer|reference" />
     </declare-styleable>
+
+    <declare-styleable name="ValueBar">
+        <attr name="bar_height" format="dimension|reference" />
+        <attr name="bar_color" format="color|reference" />
+        <attr name="bar_value" format="integer|reference" />
+        <attr name="bar_value_size" format="dimension|reference" />
+        <attr name="bar_value_color" format="color|reference" />
+        <attr name="bar_label_min_value" format="integer|reference" />
+        <attr name="bar_label_max_value" format="integer|reference" />
+        <attr name="bar_label_value_size" format="dimension|reference" />
+        <attr name="bar_label_value_color" format="color|reference" />
+        <attr name="bar_orientation" format="enum|reference">
+            <enum name="horizontal" value="0" />
+            <enum name="vertical" value="1" />
+        </attr>
+    </declare-styleable>
 </resources>
