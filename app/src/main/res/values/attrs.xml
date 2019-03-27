@@ -21,5 +21,6 @@
         <attr name="bar_label_value_size" format="dimension|reference" />
         <attr name="bar_label_value_color" format="color|reference" />
         <attr name="bar_thumb" format="integer|reference" />
+        <attr name="bar_balloon_color" format="color|reference" />
     </declare-styleable>
 </resources>

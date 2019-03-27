@@ -39,11 +39,10 @@ class ValueBar @JvmOverloads constructor(
     private var barValueSize = 0f
     private var barLabelValueSize = 0f
 
-    private var barColor = Color.WHITE
-    private var barValueColor = Color.WHITE
-    private var barLabelValueColor = Color.WHITE
-
-//    private var barThumb = 0
+    private var barColor = 0
+    private var barValueColor = 0
+    private var barLabelValueColor = 0
+    private var barBalloonColor = 0
 
     private val baseBar by lazy {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -82,7 +81,7 @@ class ValueBar @JvmOverloads constructor(
 
     private val balloonBack by lazy {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.GREEN
+            color = barBalloonColor
         }
     }
 
@@ -115,7 +114,6 @@ class ValueBar @JvmOverloads constructor(
     private var currentThumbValue = 0
 
     private var myCanvas: Canvas? = null
-
     private var isTouched = false
 
     private fun setup(context: Context?, attrs: AttributeSet?, defStyleAttr: Int = 0) {
@@ -129,9 +127,7 @@ class ValueBar @JvmOverloads constructor(
         typedArray?.getColor(R.styleable.ValueBar_bar_color, Color.WHITE)?.let { barColor = it }
         typedArray?.getColor(R.styleable.ValueBar_bar_value_color, Color.WHITE)?.let { barValueColor = it }
         typedArray?.getColor(R.styleable.ValueBar_bar_label_value_color, Color.WHITE)?.let { barLabelValueColor = it }
-//        typedArray?.getResourceId(R.styleable.ValueBar_bar_thumb, 0)?.let {
-//            barThumb = it
-//        }
+        typedArray?.getColor(R.styleable.ValueBar_bar_balloon_color, Color.GREEN)?.let { barBalloonColor = it }
         typedArray?.recycle()
 
         Timer().apply {
@@ -192,21 +188,18 @@ class ValueBar @JvmOverloads constructor(
                     val progress = (barInfo.length + paddingTop - currentThumbY) * 100 / barInfo.length
                     currentThumbValue = Math.ceil(barLabelMaxValue.toDouble() / 100 * progress).toInt()
                     listener?.progress(currentThumbValue)
-                    debugLog("value: $currentThumbValue")
                 }
                 barInfo.stopY > event.y -> {
                     currentThumbY = barInfo.stopY
                     val progress = (barInfo.length + paddingTop - currentThumbY) * 100 / barInfo.length
                     currentThumbValue = Math.ceil(barLabelMaxValue.toDouble() / 100 * progress).toInt()
                     listener?.progress(currentThumbValue)
-                    debugLog("value: $currentThumbValue")
                 }
                 barInfo.startY < event.y -> {
                     currentThumbY = barInfo.startY
                     val progress = (barInfo.length + paddingTop - currentThumbY) * 100 / barInfo.length
                     currentThumbValue = Math.ceil(barLabelMaxValue.toDouble() / 100 * progress).toInt()
                     listener?.progress(currentThumbValue)
-                    debugLog("value: $currentThumbValue")
                 }
             }
             MotionEvent.ACTION_UP -> isTouched = false
