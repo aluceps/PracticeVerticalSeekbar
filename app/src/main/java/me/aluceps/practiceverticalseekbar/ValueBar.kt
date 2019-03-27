@@ -2,6 +2,8 @@ package me.aluceps.practiceverticalseekbar
 
 import android.content.Context
 import android.graphics.*
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.VectorDrawable
 import android.util.AttributeSet
 import android.util.Log
 import android.view.MotionEvent
@@ -43,6 +45,9 @@ class ValueBar @JvmOverloads constructor(
     private var barValueColor = 0
     private var barLabelValueColor = 0
     private var barBalloonColor = 0
+
+    private var thumbResOn: Drawable? = null
+    private var thumbResOff: Drawable? = null
 
     private val baseBar by lazy {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -110,6 +115,14 @@ class ValueBar @JvmOverloads constructor(
         )
     }
 
+    private val thumbOff by lazy {
+        thumbResOff?.let { getBitmap(it) }
+    }
+
+    private val thumbOn by lazy {
+        thumbResOn?.let { getBitmap(it) }
+    }
+
     private var currentThumbY = 0
     private var currentThumbValue = 0
 
@@ -128,6 +141,8 @@ class ValueBar @JvmOverloads constructor(
         typedArray?.getColor(R.styleable.ValueBar_bar_value_color, Color.WHITE)?.let { barValueColor = it }
         typedArray?.getColor(R.styleable.ValueBar_bar_label_value_color, Color.WHITE)?.let { barLabelValueColor = it }
         typedArray?.getColor(R.styleable.ValueBar_bar_balloon_color, Color.GREEN)?.let { barBalloonColor = it }
+        typedArray?.getDrawable(R.styleable.ValueBar_bar_thumb_on)?.let { thumbResOn = it }
+        typedArray?.getDrawable(R.styleable.ValueBar_bar_thumb_off)?.let { thumbResOff = it }
         typedArray?.recycle()
 
         Timer().apply {
@@ -237,7 +252,12 @@ class ValueBar @JvmOverloads constructor(
         if (currentThumbY == 0) currentThumbY = barInfo.startY
         val x = barInfo.startX
         val y = currentThumbY
-        canvas.drawCircle(x.toFloat(), y.toFloat(), radius, thumb)
+        val thumbDrawable = if (isTouched) thumbOn else thumbOff
+        thumbDrawable?.let { bitmap ->
+            val rect = Rect(0, 0, bitmap.width, bitmap.height)
+            val dest = Rect(x - bitmap.width, y - bitmap.height, x + bitmap.width, y + bitmap.height)
+            canvas.drawBitmap(bitmap, rect, dest, Paint())
+        } ?: canvas.drawCircle(x.toFloat(), y.toFloat(), radius, thumb)
     }
 
     private fun drawBalloon(canvas: Canvas) {
@@ -279,6 +299,21 @@ class ValueBar @JvmOverloads constructor(
     private fun getRect(paint: Paint, value: Int): Rect = Rect().apply {
         val text = value.toString()
         paint.getTextBounds(text, 0, text.length, this)
+    }
+
+    private fun getBitmap(target: Drawable): Bitmap? = when (target) {
+        is VectorDrawable -> {
+            val bitmap = Bitmap.createBitmap(
+                target.intrinsicWidth,
+                target.intrinsicHeight,
+                Bitmap.Config.ARGB_8888
+            )
+            val c = Canvas(bitmap)
+            target.setBounds(0, 0, c.width, c.height)
+            target.draw(c)
+            bitmap
+        }
+        else -> null
     }
 
     private fun debugLog(message: String) {
