@@ -12,8 +12,8 @@ enum class Orientation {
 
     companion object {
         fun createOrNull(value: Int): Orientation? = when (value) {
-            Horizontal.ordinal -> Horizontal
-            Vertical.ordinal -> Vertical
+            0 -> Horizontal
+            1 -> Vertical
             else -> null
         }
     }
@@ -30,12 +30,6 @@ class ValueBar @JvmOverloads constructor(
         setup(context, attrs, defStyleAttr)
     }
 
-    private val barCenter
-        get() = (height - paddingTop - paddingBottom) / 2 + paddingTop
-
-    private val barLength
-        get() = width - paddingLeft - paddingRight
-
     private var barValue = 0
     private var barLabelMinValue = 0
     private var barLabelMaxValue = 0
@@ -48,11 +42,12 @@ class ValueBar @JvmOverloads constructor(
     private var barValueColor = Color.WHITE
     private var barLabelValueColor = Color.WHITE
 
-    private var barOrientation = Orientation.Horizontal
+    private var barOrientation = Orientation.Vertical
 
     private val baseBar by lazy {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = barColor
+            strokeWidth = barHeight
         }
     }
 
@@ -64,24 +59,34 @@ class ValueBar @JvmOverloads constructor(
     }
 
     private val minValue by lazy {
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            textSize = barLabelValueSize
-            color = barLabelValueColor
-            textAlign = Paint.Align.LEFT
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            measureText(barLabelMinValue.toString())
-        }
+        Paint().createText(barLabelMinValue)
     }
 
     private val maxValue by lazy {
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            textSize = barLabelValueSize
-            color = barLabelValueColor
-            textAlign = Paint.Align.LEFT
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            measureText(barLabelMaxValue.toString())
-        }
+        Paint().createText(barLabelMaxValue)
     }
+
+    private val margin by lazy {
+        TEXT_MARGIN * 5
+    }
+
+    private val radius by lazy {
+        barHeight * 2
+    }
+
+    // この barCenter は x/y 軸からみたの距離なので
+    // padding を足して padding 分の調整をしている
+    private val barCenter
+        get() = when (barOrientation) {
+            Orientation.Horizontal -> (height - paddingTop - paddingBottom) / 2 + paddingTop
+            Orientation.Vertical -> (width - paddingLeft - paddingRight) / 2 + paddingLeft
+        }
+
+    private val barLength
+        get() = when (barOrientation) {
+            Orientation.Horizontal -> width - paddingLeft - paddingRight
+            Orientation.Vertical -> height - paddingTop - paddingBottom
+        }
 
     private fun setup(context: Context?, attrs: AttributeSet?, defStyleAttr: Int = 0) {
         val typedArray = context?.obtainStyledAttributes(attrs, R.styleable.ValueBar, defStyleAttr, 0)
@@ -94,8 +99,12 @@ class ValueBar @JvmOverloads constructor(
         typedArray?.getColor(R.styleable.ValueBar_bar_color, Color.WHITE)?.let { barColor = it }
         typedArray?.getColor(R.styleable.ValueBar_bar_value_color, Color.WHITE)?.let { barValueColor = it }
         typedArray?.getColor(R.styleable.ValueBar_bar_label_value_color, Color.WHITE)?.let { barLabelValueColor = it }
-        typedArray?.getInt(R.styleable.ValueBar_bar_orientation, Orientation.Horizontal.ordinal)
-            ?.let { Orientation.createOrNull(it)?.let { barOrientation = it } }
+        typedArray?.getInt(R.styleable.ValueBar_bar_orientation, 0)?.let {
+            Orientation.createOrNull(it)?.let {
+                debugLog("attrs: orientation=$it")
+                barOrientation = it
+            }
+        }
         typedArray?.recycle()
     }
 
@@ -107,15 +116,17 @@ class ValueBar @JvmOverloads constructor(
     private fun measureWidth(measureSpec: Int): Int {
         debugLog("measureWidth")
         var size = paddingLeft + paddingRight
-        val bounds = Rect()
 
-        val minText = minValue.toString()
-        minValue.getTextBounds(minText, 0, minText.length, bounds)
-        size += bounds.width()
-
-        val maxText = maxValue.toString()
-        maxValue.getTextBounds(maxText, 0, maxText.length, bounds)
-        size += bounds.width()
+        when (barOrientation) {
+            Orientation.Horizontal -> {
+                size += barLength
+                size += getRect(minValue, barLabelMinValue).width()
+            }
+            Orientation.Vertical -> {
+                size += radius.toInt()
+            }
+        }
+        size += getRect(maxValue, barLabelMaxValue).width()
 
         return resolveSizeAndState(size, measureSpec, 0)
     }
@@ -123,12 +134,29 @@ class ValueBar @JvmOverloads constructor(
     private fun measureHeight(measureSpec: Int): Int {
         debugLog("measureHeight")
         var size = paddingTop + paddingBottom
-        size += minValue.fontSpacing.toInt()
 
-        val maxValueTextSpacing = maxValue.fontSpacing
-        size += Math.max(maxValueTextSpacing, barHeight).toInt()
+        when (barOrientation) {
+            Orientation.Horizontal -> {
+                size += minValue.fontSpacing.toInt()
+                size += Math.max(maxValue.fontSpacing, barHeight).toInt()
+            }
+            Orientation.Vertical -> {
+                size += minValue.fontSpacing.toInt()
+                size += maxValue.fontSpacing.toInt()
+                size += barLength
+            }
+        }
 
         return resolveSizeAndState(size, measureSpec, 0)
+    }
+
+    private fun Paint.createText(value: Int): Paint = apply {
+        isAntiAlias = true
+        color = barLabelValueColor
+        textSize = barLabelValueSize
+        textAlign = Paint.Align.LEFT
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        measureText(value.toString())
     }
 
     override fun onDraw(canvas: Canvas?) {
@@ -141,45 +169,69 @@ class ValueBar @JvmOverloads constructor(
 
     private fun drawBar(canvas: Canvas) {
         debugLog("drawBar")
-        val halfBarHeight = barHeight / 2
-        val minRect = getRect(minValue, barLabelMinValue.toString())
-        val maxRect = getRect(maxValue, barLabelMaxValue.toString())
-
-        val top = barCenter - halfBarHeight
-        val bottom = barCenter + halfBarHeight
-        val left = paddingLeft + minRect.width() + TEXT_MARGIN * 3
-        val right = width - paddingRight - maxRect.width() - TEXT_MARGIN * 2
-        val rect = RectF(left, top, right, bottom)
-
-        debugLog("drawBar: rect=$rect barCenter=$barCenter halfBarHeight=$halfBarHeight")
-        canvas.drawRoundRect(rect, halfBarHeight, halfBarHeight, baseBar)
-        canvas.drawCircle(left, barCenter.toFloat(), barHeight * 2, point)
-        canvas.drawCircle(right, barCenter.toFloat(), barHeight * 2, point)
+        when (barOrientation) {
+            Orientation.Horizontal -> {
+                val startx = paddingLeft + margin
+                val stopx = width - paddingRight - margin
+                val starty = barCenter.toFloat()
+                val stopy = barCenter.toFloat()
+                canvas.drawLine(startx, starty, stopx, stopy, baseBar)
+                canvas.drawCircle(startx, starty, radius, point)
+                canvas.drawCircle(stopx, stopy, radius, point)
+            }
+            Orientation.Vertical -> {
+                val rect = getRect(maxValue, barLabelMaxValue)
+                val startx = width - paddingRight - barHeight
+                val stopx = width - paddingRight - barHeight
+                val starty = (height - paddingBottom - rect.height() / 2).toFloat()
+                val stopy = (paddingTop + rect.height() / 2).toFloat()
+                canvas.drawLine(startx, starty, stopx, stopy, baseBar)
+                canvas.drawCircle(startx, starty, radius, point)
+                canvas.drawCircle(stopx, stopy, radius, point)
+            }
+        }
     }
 
     private fun drawMinValue(canvas: Canvas) {
         debugLog("drawMinValue")
+        val rect = getRect(minValue, barLabelMinValue)
         val text = barLabelMinValue.toString()
-        val rect = getRect(minValue, barLabelMinValue.toString())
 
-        val x = paddingLeft.toFloat()
-        val y = (barCenter + rect.height() / 2).toFloat()
+        val (x, y) = when (barOrientation) {
+            Orientation.Horizontal -> Pair(
+                paddingLeft + margin - rect.width() / 2,
+                (barCenter - rect.height()).toFloat()
+            )
+            Orientation.Vertical -> Pair(
+                width - paddingRight - barHeight - rect.width() - margin,
+                (height - paddingBottom).toFloat()
+            )
+        }
 
         canvas.drawText(text, x, y, minValue)
     }
 
     private fun drawMaxValue(canvas: Canvas) {
         debugLog("drawMaxValue")
+        val rect = getRect(maxValue, barLabelMaxValue)
         val text = barLabelMaxValue.toString()
-        val rect = getRect(maxValue, barLabelMaxValue.toString())
 
-        val x = (width - paddingRight - rect.width()).toFloat()
-        val y = (barCenter + rect.height() / 2).toFloat()
+        val (x, y) = when (barOrientation) {
+            Orientation.Horizontal -> Pair(
+                width - paddingRight - margin - rect.width() / 2,
+                (barCenter - rect.height()).toFloat()
+            )
+            Orientation.Vertical -> Pair(
+                width - paddingRight - barHeight - rect.width() - margin,
+                (paddingTop + rect.height()).toFloat()
+            )
+        }
 
         canvas.drawText(text, x, y, maxValue)
     }
 
-    private fun getRect(paint: Paint, text: String): Rect = Rect().apply {
+    private fun getRect(paint: Paint, value: Int): Rect = Rect().apply {
+        val text = value.toString()
         paint.getTextBounds(text, 0, text.length, this)
     }
 
