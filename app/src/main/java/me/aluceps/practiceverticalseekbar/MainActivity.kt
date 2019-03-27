@@ -22,6 +22,14 @@ class MainActivity : AppCompatActivity(), OnChangeListener {
         debugLog("progress: $value")
     }
 
+    override fun onDown() {
+        debugLog("onDown")
+    }
+
+    override fun onUp() {
+        debugLog("onUp")
+    }
+
     private fun debugLog(message: String) {
         Log.d("MainActivity", message)
     }

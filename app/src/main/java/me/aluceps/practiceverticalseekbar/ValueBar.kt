@@ -20,6 +20,8 @@ data class BarInfo(
 
 interface OnChangeListener {
     fun progress(value: Int)
+    fun onDown()
+    fun onUp()
 }
 
 /**
@@ -193,7 +195,10 @@ class ValueBar @JvmOverloads constructor(
 
     override fun onTouchEvent(event: MotionEvent?): Boolean {
         when (event?.action) {
-            MotionEvent.ACTION_DOWN -> isTouched = true
+            MotionEvent.ACTION_DOWN -> {
+                isTouched = true
+                listener?.onDown()
+            }
             MotionEvent.ACTION_MOVE -> when {
                 barInfo.stopY <= event.y && barInfo.startY >= event.y -> {
                     currentThumbY = event.y.toInt()
@@ -214,7 +219,10 @@ class ValueBar @JvmOverloads constructor(
                     listener?.progress(currentThumbValue)
                 }
             }
-            MotionEvent.ACTION_UP -> isTouched = false
+            MotionEvent.ACTION_UP -> {
+                isTouched = false
+                listener?.onUp()
+            }
             MotionEvent.ACTION_CANCEL -> Unit
         }
         return true
