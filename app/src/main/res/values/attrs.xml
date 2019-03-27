@@ -20,5 +20,6 @@
         <attr name="bar_label_max_value" format="integer|reference" />
         <attr name="bar_label_value_size" format="dimension|reference" />
         <attr name="bar_label_value_color" format="color|reference" />
+        <attr name="bar_thumb" format="integer|reference" />
     </declare-styleable>
 </resources>

@@ -39,6 +39,9 @@ class ValueBar @JvmOverloads constructor(
     private var barValueColor = Color.WHITE
     private var barLabelValueColor = Color.WHITE
 
+    //    private var barThumb: Drawable? = null
+    private var barThumb = 0
+
     private val baseBar by lazy {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = barColor
@@ -53,7 +56,7 @@ class ValueBar @JvmOverloads constructor(
         }
     }
 
-    private val cursor by lazy {
+    private val thumb by lazy {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.RED
             strokeWidth = barHeight
@@ -66,6 +69,18 @@ class ValueBar @JvmOverloads constructor(
 
     private val maxValue by lazy {
         Paint().createText(barLabelMaxValue)
+    }
+
+    private val balloonText by lazy {
+        Paint().createText(barLabelMaxValue).apply {
+            textAlign = Paint.Align.CENTER
+        }
+    }
+
+    private val balloonBack by lazy {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.GREEN
+        }
     }
 
     private val margin by lazy {
@@ -93,7 +108,8 @@ class ValueBar @JvmOverloads constructor(
         )
     }
 
-    private var cursorY = 0
+    private var currentThumbY = 0
+    private var currentThumbValue = 0
 
     private var myCanvas: Canvas? = null
 
@@ -108,6 +124,9 @@ class ValueBar @JvmOverloads constructor(
         typedArray?.getColor(R.styleable.ValueBar_bar_color, Color.WHITE)?.let { barColor = it }
         typedArray?.getColor(R.styleable.ValueBar_bar_value_color, Color.WHITE)?.let { barValueColor = it }
         typedArray?.getColor(R.styleable.ValueBar_bar_label_value_color, Color.WHITE)?.let { barLabelValueColor = it }
+//        typedArray?.getResourceId(R.styleable.ValueBar_bar_thumb, 0)?.let {
+//            barThumb = it
+//        }
         typedArray?.recycle()
 
         Timer().apply {
@@ -147,9 +166,10 @@ class ValueBar @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas?) {
         canvas ?: return
         drawBar(canvas)
-        drawCursor(canvas)
         drawMinValue(canvas)
         drawMaxValue(canvas)
+        drawThumb(canvas)
+        drawBalloon(canvas)
         myCanvas = canvas
     }
 
@@ -157,9 +177,18 @@ class ValueBar @JvmOverloads constructor(
         when (event?.action) {
             MotionEvent.ACTION_DOWN -> Unit
             MotionEvent.ACTION_MOVE -> when {
-                barInfo.stopY <= event.y && barInfo.startY >= event.y -> cursorY = event.y.toInt()
-                barInfo.stopY > event.y -> cursorY = barInfo.stopY
-                barInfo.startY < event.y -> cursorY = barInfo.startY
+                barInfo.stopY <= event.y && barInfo.startY >= event.y -> {
+                    currentThumbY = event.y.toInt()
+                    currentThumbValue = (barInfo.length + paddingTop - currentThumbY)
+                }
+                barInfo.stopY > event.y -> {
+                    currentThumbY = barInfo.stopY
+                    currentThumbValue = (barInfo.length + paddingTop - currentThumbY)
+                }
+                barInfo.startY < event.y -> {
+                    currentThumbY = barInfo.startY
+                    currentThumbValue = (barInfo.length + paddingTop - currentThumbY)
+                }
             }
             MotionEvent.ACTION_UP -> Unit
             MotionEvent.ACTION_CANCEL -> Unit
@@ -192,10 +221,36 @@ class ValueBar @JvmOverloads constructor(
         canvas.drawText(textValue, x, y, maxValue)
     }
 
-    private fun drawCursor(canvas: Canvas) {
-        if (cursorY == 0) cursorY = barInfo.startY
-        val x = barInfo.startX.toFloat()
-        canvas.drawCircle(x, cursorY.toFloat(), radius, cursor)
+    private fun drawThumb(canvas: Canvas) {
+        if (currentThumbY == 0) currentThumbY = barInfo.startY
+        val x = barInfo.startX
+        val y = currentThumbY
+        canvas.drawCircle(x.toFloat(), y.toFloat(), radius, thumb)
+    }
+
+    private fun drawBalloon(canvas: Canvas) {
+        if (currentThumbY == 0) currentThumbY = barInfo.startY
+        val textRect = getRect(balloonText, currentThumbValue)
+        val textValue = currentThumbValue.toString()
+
+        // balloon 表示位置を計算
+        val x = barInfo.startX - TEXT_MARGIN * 10
+        val y = (currentThumbY + textRect.height() / 2).toFloat()
+
+        // balloon の背景のサイズを計算
+        val textWidth = balloonText.measureText(textValue)
+        val left = (textRect.left - textWidth / 2 - TEXT_MARGIN * 3)
+        val top = textRect.top.toFloat() - TEXT_MARGIN * 3
+        val right = (textRect.right - textWidth / 2 + TEXT_MARGIN * 3)
+        val bottom = textRect.bottom.toFloat() + TEXT_MARGIN * 3
+
+        // offset を変更して balloonBack の表示位置を変更
+        val balloonBackRect = RectF(left, top, right, bottom)
+        balloonBackRect.offset(x, y)
+
+        // balloonBack は balloonText の背景なので先に描画
+        canvas.drawRoundRect(balloonBackRect, 50f, 50f, balloonBack)
+        canvas.drawText(textValue, x, y, balloonText)
     }
 
     private fun getRect(paint: Paint, value: Int): Rect = Rect().apply {
