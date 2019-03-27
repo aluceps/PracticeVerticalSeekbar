@@ -49,6 +49,12 @@ class ValueBar @JvmOverloads constructor(
     private var thumbResOn: Drawable? = null
     private var thumbResOff: Drawable? = null
 
+    private var currentThumbY = 0
+    private var currentThumbValue = 0
+
+    private var myCanvas: Canvas? = null
+    private var isTouched = false
+
     private val baseBar by lazy {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = barColor
@@ -115,19 +121,8 @@ class ValueBar @JvmOverloads constructor(
         )
     }
 
-    private val thumbOff by lazy {
-        thumbResOff?.let { getBitmap(it) }
-    }
-
-    private val thumbOn by lazy {
-        thumbResOn?.let { getBitmap(it) }
-    }
-
-    private var currentThumbY = 0
-    private var currentThumbValue = 0
-
-    private var myCanvas: Canvas? = null
-    private var isTouched = false
+    private val thumbOff by lazy { thumbResOff?.let { getBitmap(it) } }
+    private val thumbOn by lazy { thumbResOn?.let { getBitmap(it) } }
 
     private fun setup(context: Context?, attrs: AttributeSet?, defStyleAttr: Int = 0) {
         val typedArray = context?.obtainStyledAttributes(attrs, R.styleable.ValueBar, defStyleAttr, 0)
@@ -186,9 +181,11 @@ class ValueBar @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas?) {
         canvas ?: return
-        drawBar(canvas)
-        drawMinValue(canvas)
-        drawMaxValue(canvas)
+        if (!isTouched) {
+            drawBar(canvas)
+            drawMinValue(canvas)
+            drawMaxValue(canvas)
+        }
         drawThumb(canvas)
         drawBalloon(canvas)
         myCanvas = canvas
@@ -265,7 +262,7 @@ class ValueBar @JvmOverloads constructor(
         val textRect = getRect(balloonText, currentThumbValue)
         val textValue = currentThumbValue.toString()
 
-        // balloon 表示位置を計算
+        // balloon の表示位置を計算
         val (x, y) = if (isTouched) {
             balloonText.textSize = barLabelValueSize * 2
             Pair(
