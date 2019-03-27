@@ -4,20 +4,17 @@ import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
 import android.util.Log
+import android.view.MotionEvent
 import android.view.View
+import java.util.*
 
-enum class Orientation {
-    Horizontal,
-    Vertical;
-
-    companion object {
-        fun createOrNull(value: Int): Orientation? = when (value) {
-            0 -> Horizontal
-            1 -> Vertical
-            else -> null
-        }
-    }
-}
+data class BarInfo(
+    val startX: Int,
+    val startY: Int,
+    val stopX: Int,
+    val stopY: Int,
+    val length: Int
+)
 
 /**
  * via: https://github.com/IntertechInc/android-custom-view-tutorial/blob/master/customviews/src/main/java/com/intertech/customviews/ValueBar.java
@@ -42,8 +39,6 @@ class ValueBar @JvmOverloads constructor(
     private var barValueColor = Color.WHITE
     private var barLabelValueColor = Color.WHITE
 
-    private var barOrientation = Orientation.Vertical
-
     private val baseBar by lazy {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = barColor
@@ -58,6 +53,13 @@ class ValueBar @JvmOverloads constructor(
         }
     }
 
+    private val cursor by lazy {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.RED
+            strokeWidth = barHeight
+        }
+    }
+
     private val minValue by lazy {
         Paint().createText(barLabelMinValue)
     }
@@ -67,26 +69,33 @@ class ValueBar @JvmOverloads constructor(
     }
 
     private val margin by lazy {
-        TEXT_MARGIN * 5
+        TEXT_MARGIN * 10
     }
 
     private val radius by lazy {
         barHeight * 2
     }
 
-    // この barCenter は x/y 軸からみたの距離なので
-    // padding を足して padding 分の調整をしている
-    private val barCenter
-        get() = when (barOrientation) {
-            Orientation.Horizontal -> (height - paddingTop - paddingBottom) / 2 + paddingTop
-            Orientation.Vertical -> (width - paddingLeft - paddingRight) / 2 + paddingLeft
-        }
+    private val contentWidth by lazy {
+        getRect(maxValue, barLabelMaxValue).width() + margin + barHeight
+    }
 
-    private val barLength
-        get() = when (barOrientation) {
-            Orientation.Horizontal -> width - paddingLeft - paddingRight
-            Orientation.Vertical -> height - paddingTop - paddingBottom
-        }
+    /**
+     * この情報は onMeasure 以降に取得可能
+     */
+    private val barInfo by lazy {
+        BarInfo(
+            (measuredWidth - paddingRight - barHeight).toInt(),
+            measuredHeight - paddingBottom,
+            (measuredWidth - paddingRight - barHeight).toInt(),
+            paddingTop,
+            measuredHeight - paddingTop - paddingBottom
+        )
+    }
+
+    private var cursorY = 0
+
+    private var myCanvas: Canvas? = null
 
     private fun setup(context: Context?, attrs: AttributeSet?, defStyleAttr: Int = 0) {
         val typedArray = context?.obtainStyledAttributes(attrs, R.styleable.ValueBar, defStyleAttr, 0)
@@ -99,54 +108,30 @@ class ValueBar @JvmOverloads constructor(
         typedArray?.getColor(R.styleable.ValueBar_bar_color, Color.WHITE)?.let { barColor = it }
         typedArray?.getColor(R.styleable.ValueBar_bar_value_color, Color.WHITE)?.let { barValueColor = it }
         typedArray?.getColor(R.styleable.ValueBar_bar_label_value_color, Color.WHITE)?.let { barLabelValueColor = it }
-        typedArray?.getInt(R.styleable.ValueBar_bar_orientation, 0)?.let {
-            Orientation.createOrNull(it)?.let {
-                debugLog("attrs: orientation=$it")
-                barOrientation = it
-            }
-        }
         typedArray?.recycle()
+
+        Timer().apply {
+            schedule(object : TimerTask() {
+                override fun run() {
+                    invalidate()
+                }
+            }, 10, 10)
+        }
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        debugLog("onMeasure")
         setMeasuredDimension(measureWidth(widthMeasureSpec), measureHeight(heightMeasureSpec))
     }
 
     private fun measureWidth(measureSpec: Int): Int {
-        debugLog("measureWidth")
         var size = paddingLeft + paddingRight
-
-        when (barOrientation) {
-            Orientation.Horizontal -> {
-                size += barLength
-                size += getRect(minValue, barLabelMinValue).width()
-            }
-            Orientation.Vertical -> {
-                size += radius.toInt()
-            }
-        }
-        size += getRect(maxValue, barLabelMaxValue).width()
-
+        size += contentWidth.toInt()
         return resolveSizeAndState(size, measureSpec, 0)
     }
 
     private fun measureHeight(measureSpec: Int): Int {
-        debugLog("measureHeight")
         var size = paddingTop + paddingBottom
-
-        when (barOrientation) {
-            Orientation.Horizontal -> {
-                size += minValue.fontSpacing.toInt()
-                size += Math.max(maxValue.fontSpacing, barHeight).toInt()
-            }
-            Orientation.Vertical -> {
-                size += minValue.fontSpacing.toInt()
-                size += maxValue.fontSpacing.toInt()
-                size += barLength
-            }
-        }
-
+        size += height - paddingTop - paddingBottom
         return resolveSizeAndState(size, measureSpec, 0)
     }
 
@@ -160,74 +145,57 @@ class ValueBar @JvmOverloads constructor(
     }
 
     override fun onDraw(canvas: Canvas?) {
-        debugLog("onDraw")
         canvas ?: return
         drawBar(canvas)
+        drawCursor(canvas)
         drawMinValue(canvas)
         drawMaxValue(canvas)
+        myCanvas = canvas
+    }
+
+    override fun onTouchEvent(event: MotionEvent?): Boolean {
+        when (event?.action) {
+            MotionEvent.ACTION_DOWN -> Unit
+            MotionEvent.ACTION_MOVE -> when {
+                barInfo.stopY <= event.y && barInfo.startY >= event.y -> cursorY = event.y.toInt()
+                barInfo.stopY > event.y -> cursorY = barInfo.stopY
+                barInfo.startY < event.y -> cursorY = barInfo.startY
+            }
+            MotionEvent.ACTION_UP -> Unit
+            MotionEvent.ACTION_CANCEL -> Unit
+        }
+        return true
     }
 
     private fun drawBar(canvas: Canvas) {
-        debugLog("drawBar")
-        when (barOrientation) {
-            Orientation.Horizontal -> {
-                val startx = paddingLeft + margin
-                val stopx = width - paddingRight - margin
-                val starty = barCenter.toFloat()
-                val stopy = barCenter.toFloat()
-                canvas.drawLine(startx, starty, stopx, stopy, baseBar)
-                canvas.drawCircle(startx, starty, radius, point)
-                canvas.drawCircle(stopx, stopy, radius, point)
-            }
-            Orientation.Vertical -> {
-                val rect = getRect(maxValue, barLabelMaxValue)
-                val startx = width - paddingRight - barHeight
-                val stopx = width - paddingRight - barHeight
-                val starty = (height - paddingBottom - rect.height() / 2).toFloat()
-                val stopy = (paddingTop + rect.height() / 2).toFloat()
-                canvas.drawLine(startx, starty, stopx, stopy, baseBar)
-                canvas.drawCircle(startx, starty, radius, point)
-                canvas.drawCircle(stopx, stopy, radius, point)
-            }
-        }
+        val x = barInfo.startX.toFloat()
+        val y1 = barInfo.startY.toFloat()
+        val y2 = barInfo.stopY.toFloat()
+        canvas.drawLine(x, y1, x, y2, baseBar)
+        canvas.drawCircle(x, y1, radius, point)
+        canvas.drawCircle(x, y2, radius, point)
     }
 
     private fun drawMinValue(canvas: Canvas) {
-        debugLog("drawMinValue")
-        val rect = getRect(minValue, barLabelMinValue)
-        val text = barLabelMinValue.toString()
-
-        val (x, y) = when (barOrientation) {
-            Orientation.Horizontal -> Pair(
-                paddingLeft + margin - rect.width() / 2,
-                (barCenter - rect.height()).toFloat()
-            )
-            Orientation.Vertical -> Pair(
-                width - paddingRight - barHeight - rect.width() - margin,
-                (height - paddingBottom).toFloat()
-            )
-        }
-
-        canvas.drawText(text, x, y, minValue)
+        val textRect = getRect(minValue, barLabelMinValue)
+        val textValue = barLabelMinValue.toString()
+        val x = barInfo.startX - margin - textRect.width()
+        val y = (barInfo.startY + textRect.height() / 2).toFloat()
+        canvas.drawText(textValue, x, y, minValue)
     }
 
     private fun drawMaxValue(canvas: Canvas) {
-        debugLog("drawMaxValue")
-        val rect = getRect(maxValue, barLabelMaxValue)
-        val text = barLabelMaxValue.toString()
+        val textRect = getRect(maxValue, barLabelMaxValue)
+        val textValue = barLabelMaxValue.toString()
+        val x = barInfo.stopX - margin - textRect.width()
+        val y = (barInfo.stopY + textRect.height() / 2).toFloat()
+        canvas.drawText(textValue, x, y, maxValue)
+    }
 
-        val (x, y) = when (barOrientation) {
-            Orientation.Horizontal -> Pair(
-                width - paddingRight - margin - rect.width() / 2,
-                (barCenter - rect.height()).toFloat()
-            )
-            Orientation.Vertical -> Pair(
-                width - paddingRight - barHeight - rect.width() - margin,
-                (paddingTop + rect.height()).toFloat()
-            )
-        }
-
-        canvas.drawText(text, x, y, maxValue)
+    private fun drawCursor(canvas: Canvas) {
+        if (cursorY == 0) cursorY = barInfo.startY
+        val x = barInfo.startX.toFloat()
+        canvas.drawCircle(x, cursorY.toFloat(), radius, cursor)
     }
 
     private fun getRect(paint: Paint, value: Int): Rect = Rect().apply {
