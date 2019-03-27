@@ -26,13 +26,15 @@
             />
 
         <me.aluceps.practiceverticalseekbar.ValueBar
+            android:id="@+id/value_bar"
             android:layout_width="wrap_content"
             android:layout_height="240dp"
             android:layout_margin="32dp"
             android:background="@android:color/darker_gray"
-            android:padding="16dp"
+            android:padding="32dp"
             app:bar_color="@color/colorAccent"
             app:bar_height="2dp"
+            app:bar_label_max_value="15"
             app:bar_label_value_size="14sp"
             app:bar_thumb="@drawable/ic_thumb"
             app:bar_value_size="18sp"

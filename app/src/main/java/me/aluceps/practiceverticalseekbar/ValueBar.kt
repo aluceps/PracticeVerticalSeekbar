@@ -16,6 +16,10 @@ data class BarInfo(
     val length: Int
 )
 
+interface OnChangeListener {
+    fun progress(value: Int)
+}
+
 /**
  * via: https://github.com/IntertechInc/android-custom-view-tutorial/blob/master/customviews/src/main/java/com/intertech/customviews/ValueBar.java
  */
@@ -39,8 +43,7 @@ class ValueBar @JvmOverloads constructor(
     private var barValueColor = Color.WHITE
     private var barLabelValueColor = Color.WHITE
 
-    //    private var barThumb: Drawable? = null
-    private var barThumb = 0
+//    private var barThumb = 0
 
     private val baseBar by lazy {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -113,6 +116,8 @@ class ValueBar @JvmOverloads constructor(
 
     private var myCanvas: Canvas? = null
 
+    private var isTouched = false
+
     private fun setup(context: Context?, attrs: AttributeSet?, defStyleAttr: Int = 0) {
         val typedArray = context?.obtainStyledAttributes(attrs, R.styleable.ValueBar, defStyleAttr, 0)
         typedArray?.getInt(R.styleable.ValueBar_bar_value, 0)?.let { barValue = it }
@@ -136,6 +141,11 @@ class ValueBar @JvmOverloads constructor(
                 }
             }, 10, 10)
         }
+    }
+
+    private var listener: OnChangeListener? = null
+    fun setupListener(listener: OnChangeListener) {
+        this.listener = listener
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -175,22 +185,31 @@ class ValueBar @JvmOverloads constructor(
 
     override fun onTouchEvent(event: MotionEvent?): Boolean {
         when (event?.action) {
-            MotionEvent.ACTION_DOWN -> Unit
+            MotionEvent.ACTION_DOWN -> isTouched = true
             MotionEvent.ACTION_MOVE -> when {
                 barInfo.stopY <= event.y && barInfo.startY >= event.y -> {
                     currentThumbY = event.y.toInt()
-                    currentThumbValue = (barInfo.length + paddingTop - currentThumbY)
+                    val progress = (barInfo.length + paddingTop - currentThumbY) * 100 / barInfo.length
+                    currentThumbValue = Math.ceil(barLabelMaxValue.toDouble() / 100 * progress).toInt()
+                    listener?.progress(currentThumbValue)
+                    debugLog("value: $currentThumbValue")
                 }
                 barInfo.stopY > event.y -> {
                     currentThumbY = barInfo.stopY
-                    currentThumbValue = (barInfo.length + paddingTop - currentThumbY)
+                    val progress = (barInfo.length + paddingTop - currentThumbY) * 100 / barInfo.length
+                    currentThumbValue = Math.ceil(barLabelMaxValue.toDouble() / 100 * progress).toInt()
+                    listener?.progress(currentThumbValue)
+                    debugLog("value: $currentThumbValue")
                 }
                 barInfo.startY < event.y -> {
                     currentThumbY = barInfo.startY
-                    currentThumbValue = (barInfo.length + paddingTop - currentThumbY)
+                    val progress = (barInfo.length + paddingTop - currentThumbY) * 100 / barInfo.length
+                    currentThumbValue = Math.ceil(barLabelMaxValue.toDouble() / 100 * progress).toInt()
+                    listener?.progress(currentThumbValue)
+                    debugLog("value: $currentThumbValue")
                 }
             }
-            MotionEvent.ACTION_UP -> Unit
+            MotionEvent.ACTION_UP -> isTouched = false
             MotionEvent.ACTION_CANCEL -> Unit
         }
         return true
@@ -234,14 +253,25 @@ class ValueBar @JvmOverloads constructor(
         val textValue = currentThumbValue.toString()
 
         // balloon 表示位置を計算
-        val x = barInfo.startX - TEXT_MARGIN * 10
-        val y = (currentThumbY + textRect.height() / 2).toFloat()
+        val (x, y) = if (isTouched) {
+            balloonText.textSize = barLabelValueSize * 2
+            Pair(
+                barInfo.startX - TEXT_MARGIN * 3,
+                (currentThumbY - textRect.height()).toFloat()
+            )
+        } else {
+            balloonText.textSize = barLabelValueSize
+            Pair(
+                barInfo.startX - TEXT_MARGIN * 12,
+                (currentThumbY + textRect.height() / 2).toFloat()
+            )
+        }
 
         // balloon の背景のサイズを計算
         val textWidth = balloonText.measureText(textValue)
-        val left = (textRect.left - textWidth / 2 - TEXT_MARGIN * 3)
+        val left = (textRect.left - textWidth / 2 - TEXT_MARGIN * 5)
         val top = textRect.top.toFloat() - TEXT_MARGIN * 3
-        val right = (textRect.right - textWidth / 2 + TEXT_MARGIN * 3)
+        val right = (textRect.right - textWidth / 2 + TEXT_MARGIN * 5)
         val bottom = textRect.bottom.toFloat() + TEXT_MARGIN * 3
 
         // offset を変更して balloonBack の表示位置を変更
@@ -249,7 +279,7 @@ class ValueBar @JvmOverloads constructor(
         balloonBackRect.offset(x, y)
 
         // balloonBack は balloonText の背景なので先に描画
-        canvas.drawRoundRect(balloonBackRect, 50f, 50f, balloonBack)
+        canvas.drawRoundRect(balloonBackRect, 60f, 60f, balloonBack)
         canvas.drawText(textValue, x, y, balloonText)
     }
 
