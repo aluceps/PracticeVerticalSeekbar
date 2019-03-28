@@ -16,6 +16,9 @@ class MainActivity : AppCompatActivity(), OnChangeListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding.valueBar.setupListener(this)
+        binding.reset.setOnClickListener {
+            binding.valueBar.reset()
+        }
     }
 
     override fun progress(value: Int) {

@@ -172,6 +172,11 @@ class ValueBar @JvmOverloads constructor(
         }
     }
 
+    fun reset() {
+        currentThumbY = barInfo.startY
+        currentThumbValue = 0
+    }
+
     private var listener: OnChangeListener? = null
     fun setupListener(listener: OnChangeListener) {
         this.listener = listener
