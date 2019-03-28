@@ -19,9 +19,8 @@
         <attr name="bar_label_min_value" format="integer|reference" />
         <attr name="bar_label_max_value" format="integer|reference" />
         <attr name="bar_label_value_size" format="dimension|reference" />
-        <attr name="bar_label_value_color" format="color|reference" />
         <attr name="bar_balloon_color" format="color|reference" />
-        <attr name="bar_thumb_off" format="reference" />
-        <attr name="bar_thumb_on" format="reference" />
+        <attr name="bar_thumb_on_up" format="reference" />
+        <attr name="bar_thumb_on_move" format="reference" />
     </declare-styleable>
 </resources>
