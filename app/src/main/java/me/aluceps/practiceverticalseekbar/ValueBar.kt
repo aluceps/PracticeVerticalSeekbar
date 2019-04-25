@@ -284,8 +284,8 @@ class ValueBar @JvmOverloads constructor(
     }
 
     private fun getProgressValue(value: Int, max: Int): Int {
-        val percent = (barInfo.length + paddingTop - value) * 100 / barInfo.length
-        return Math.ceil(max.toDouble() / 100 * percent).toInt()
+        val percent = (barInfo.length + paddingTop - value).toFloat() / barInfo.length
+        return Math.ceil(max.toDouble() * percent).toInt()
     }
 
     private fun drawBar(canvas: Canvas) {
