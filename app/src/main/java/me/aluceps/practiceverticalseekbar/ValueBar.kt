@@ -3,7 +3,14 @@ package me.aluceps.practiceverticalseekbar
 import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
 import android.content.Context
-import android.graphics.*
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.Rect
+import android.graphics.RectF
+import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.VectorDrawable
 import android.support.v4.content.res.ResourcesCompat
@@ -15,11 +22,11 @@ import java.util.*
 import kotlin.math.abs
 
 data class BarInfo(
-    val startX: Int,
-    val startY: Int,
-    val stopX: Int,
-    val stopY: Int,
-    val length: Int
+        val startX: Int,
+        val startY: Int,
+        val stopX: Int,
+        val stopY: Int,
+        val length: Int
 )
 
 interface OnChangeListener {
@@ -32,7 +39,7 @@ interface OnChangeListener {
  * via: https://github.com/IntertechInc/android-custom-view-tutorial/blob/master/customviews/src/main/java/com/intertech/customviews/ValueBar.java
  */
 class ValueBar @JvmOverloads constructor(
-    context: Context?, attrs: AttributeSet? = null, defStyleAttr: Int = 0
+        context: Context?, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
     init {
@@ -57,6 +64,7 @@ class ValueBar @JvmOverloads constructor(
     private var isTouched = false
 
     private var thumbResOnUp: Drawable? = null
+    private var thumbResOnUpEnable: Drawable? = null
     private var thumbResOnMove: Drawable? = null
     private var myCanvas: Canvas? = null
 
@@ -137,15 +145,16 @@ class ValueBar @JvmOverloads constructor(
      */
     private val barInfo by lazy {
         BarInfo(
-            (measuredWidth - paddingRight - barHeight).toInt(),
-            measuredHeight - paddingBottom,
-            (measuredWidth - paddingRight - barHeight).toInt(),
-            paddingTop,
-            measuredHeight - paddingTop - paddingBottom
+                (measuredWidth - paddingRight - barHeight).toInt(),
+                measuredHeight - paddingBottom,
+                (measuredWidth - paddingRight - barHeight).toInt(),
+                paddingTop,
+                measuredHeight - paddingTop - paddingBottom
         )
     }
 
     private val thumbOnUp by lazy { thumbResOnUp?.let { getBitmap(it) } }
+    private val thumbOnUpEnable by lazy { thumbResOnUpEnable?.let { getBitmap(it) } }
     private val thumbOnMove by lazy { thumbResOnMove?.let { getBitmap(it) } }
 
     private fun setup(context: Context?, attrs: AttributeSet?, defStyleAttr: Int = 0) {
@@ -160,6 +169,7 @@ class ValueBar @JvmOverloads constructor(
         typedArray?.getColor(R.styleable.ValueBar_bar_value_color, Color.WHITE)?.let { barValueColor = it }
         typedArray?.getColor(R.styleable.ValueBar_bar_balloon_color, Color.GREEN)?.let { barBalloonColor = it }
         typedArray?.getDrawable(R.styleable.ValueBar_bar_thumb_on_up)?.let { thumbResOnUp = it }
+        typedArray?.getDrawable(R.styleable.ValueBar_bar_thumb_on_up_enable)?.let { thumbResOnUpEnable = it }
         typedArray?.getDrawable(R.styleable.ValueBar_bar_thumb_on_move)?.let { thumbResOnMove = it }
         typedArray?.recycle()
 
@@ -175,6 +185,14 @@ class ValueBar @JvmOverloads constructor(
     fun reset() {
         currentThumbY = barInfo.startY
         currentThumbValue = 0
+    }
+
+    fun setMaxValue(value: Int) {
+        barLabelMaxValue = value
+    }
+
+    fun setThumbOnUp(value: Drawable) {
+        thumbResOnUp = value
     }
 
     private var listener: OnChangeListener? = null
@@ -317,10 +335,12 @@ class ValueBar @JvmOverloads constructor(
         if (currentThumbY == 0) currentThumbY = barInfo.startY
         val x = barInfo.startX
         val y = currentThumbY
-        val thumbDrawable = if (isTouched) thumbOnMove else thumbOnUp
+        val thumbDrawable =
+                if (isTouched) thumbOnMove else if (currentThumbValue > 0) thumbOnUpEnable else thumbOnUp
         thumbDrawable?.let { bitmap ->
             val rect = Rect(0, 0, bitmap.width, bitmap.height)
-            val dest = Rect(x - bitmap.width, y - bitmap.height, x + bitmap.width, y + bitmap.height)
+            val dest =
+                    Rect(x - bitmap.width, y - bitmap.height, x + bitmap.width, y + bitmap.height)
             canvas.drawBitmap(bitmap, rect, dest, Paint())
         } ?: canvas.drawCircle(x.toFloat(), y.toFloat(), radius, thumb)
     }
@@ -334,14 +354,14 @@ class ValueBar @JvmOverloads constructor(
         val (x, y) = if (isTouched) {
             balloonText.textSize = barLabelValueSize * 2
             Pair(
-                barInfo.startX - TEXT_MARGIN * 3,
-                currentThumbY - textRect.height() - TEXT_MARGIN * 3
+                    barInfo.startX - TEXT_MARGIN * 3,
+                    currentThumbY - textRect.height() - TEXT_MARGIN * 5
             )
         } else {
             balloonText.textSize = barLabelValueSize
             Pair(
-                barInfo.startX - TEXT_MARGIN * 12,
-                (currentThumbY + textRect.height() / 2).toFloat()
+                    barInfo.startX - TEXT_MARGIN * 15,
+                    (currentThumbY + textRect.height() / 2).toFloat()
             )
         }
 
@@ -352,7 +372,7 @@ class ValueBar @JvmOverloads constructor(
         val textWidth = balloonText.measureText(textValue)
         val left = textRect.left - textWidth / 2 - TEXT_MARGIN * 6
         val top = textRect.top - TEXT_MARGIN * 3
-        val right = textRect.right - textWidth / 2 + TEXT_MARGIN * 6
+//        val right = textRect.right - textWidth / 2 + TEXT_MARGIN * 6
         val bottom = textRect.bottom + TEXT_MARGIN * 3
 
         if (isTouched) {
@@ -377,9 +397,9 @@ class ValueBar @JvmOverloads constructor(
     private fun getBitmap(target: Drawable): Bitmap? = when (target) {
         is VectorDrawable -> {
             val bitmap = Bitmap.createBitmap(
-                target.intrinsicWidth,
-                target.intrinsicHeight,
-                Bitmap.Config.ARGB_8888
+                    target.intrinsicWidth,
+                    target.intrinsicHeight,
+                    Bitmap.Config.ARGB_8888
             )
             val c = Canvas(bitmap)
             target.setBounds(0, 0, c.width, c.height)
